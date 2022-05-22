@@ -5,132 +5,101 @@ const EventEmitter = require('events');
 const PORT = 700;
 const http = require('http');
 const { resolve } = require('path');
-const { argv } = require('process');
-const { callbackify } = require('util');
 const hostname = '127.0.0.1';
 //////////////////////////////
 const file_names = ['index.html','style.css'];
 const {stdout} = process;
-const { readdir } = fs.promises;
 let html_data ='', css_data='';
 let outputDir = path.join(__dirname,'project-dist');
+let writeableStreamHTML,writeableStreamCSS;
 
-let [writeableStreamHTML,writeableStreamCSS] = (function(){      
-    if (!fs.existsSync(outputDir)){ 
-        fs.mkdir(outputDir,(err)=>{if (err) throw err;});         
-    }        
-    else {  
-        reamovecatalog(path.join(outputDir));
-        ['template.html','style.css'].forEach( el =>{
-            if ( fs.existsSync(path.join(outputDir,el))){
-                fs.unlink(path.join(outputDir,el),err=>{if (err) throw err});
-            }
-        })
+const cb = (err)=>{ if(err) throw err};
+
+(async function(){ console.log('start');
+    try{     
+        if (!fs.existsSync(outputDir)) fs.mkdir(outputDir,cb);
+        else {  
+            await  reamovecatalog(path.join(outputDir));
+            ['template.html','style.css'].forEach( el =>{
+                if ( fs.existsSync(path.join(outputDir,el))){
+                    fs.unlink(path.join(outputDir,el),err=>{if (err) throw err});
+                }
+            })
+
+        }
+        if (!fs.existsSync(path.join(outputDir,'assets'))){ 
+            await fs.promises.mkdir(path.join(outputDir,'assets'));
+            return file_names.map( file =>{ return fs.createWriteStream(path.join(outputDir,`${file}`),"utf-8");}); 
+        }
+        return file_names.map( file =>{ return fs.createWriteStream(path.join(outputDir,`${file}`),"utf-8");}); 
     }
-    if (!fs.existsSync(path.join(outputDir,'assets'))){        
-        fs.mkdir(path.join(outputDir,'assets'),(err)=>{if (err) throw err;}); 
-    }     
-    return file_names.map( file =>{ return fs.createWriteStream(path.join(outputDir,`${file}`),"utf-8");}); 
-})();
+    catch (error) { console.log(error)};    
+})().then( arr=>{[writeableStreamHTML,writeableStreamCSS] = arr}).then(()=>{
+    recursiveFunc(path.join(__dirname,'assets'),path.join(outputDir,'assets'));
+}).catch( (err)=>{ throw err});
 
-function reamovecatalog(dir){     
-    fs.readdir(dir,{encoding:"utf-8",withFileTypes:true},(err,files)=>{
-        if (err)  throw Error(err);
-        if (!files.length) { console.log(`delted каталог `,dir); fs.rmdir(dir,err=>{if(err) throw err});}
+async function reamovecatalog(dir){
+    try{     
+        let files = await fs.promises.readdir(dir,{encoding:"utf-8",withFileTypes:true})
+        if (!files.length) { console.log(`delted каталог `,dir); 
+            await fs.promises.rmdir(dir);
+        }
         else{
             for (const  file of files){            
                 let symb = Object.getOwnPropertySymbols(file).shift();
                 let newdir = path.join(dir,file.name);                
                 if (file[symb] ===2) reamovecatalog(newdir);            
                 else {  console.log(`deleted file `,newdir);
-                    fs.unlink(newdir, err=>{if (err) throw err});
+                    await fs.promises.unlink(newdir);
                 }
             }
-        }})
+        }
+    }
+    catch (error) {console.log(error)}
 }    
 
-/*
-async function callbackF(resolve,files,dir) {    
-    if (!files.length) { console.log(`delted каталог `,dir); return resolve(fs.rmdir(dir,err=>{if(err) throw err}));}
-    else {
-        for (const  file of files){            
-            let symb = Object.getOwnPropertySymbols(file).shift();
-            let newdir = path.join(dir,file.name);                
-            if (file[symb] ===2) await reamovecatalog(newdir);
+let fierst = true;
+let iter = 0;
+async function recursiveFunc(mainCatalog,createCatalog){  
+    try{   
+        let files = await fs.promises.readdir(mainCatalog,{encoding:"utf-8",withFileTypes:true});
+        console.log(++iter);
+        for ( let file of files){        
+            let symb = Object.getOwnPropertySymbols(file)[0];
+            if (file[symb] === 2){
+                let newCreatedir = path.join(createCatalog,file.name), newMainDir = path.join(mainCatalog,file.name);
+                console.log('********создаю каталог*****',`${newCreatedir}`);                
+                fs.promises.mkdir(newCreatedir);
+                console.log('********создал каталог*****',`${newCreatedir}`)                
+                await recursiveFunc(newMainDir,newCreatedir); 
+            }
             else{
-                console.log(`deleted file `,newdir);                   
-                fs.unlink(newdir, err=>{if (err) throw err});
+                console.log(++iter);
+                console.log(`========== file записать ${file.name}`);
+                let readstream = fs.createReadStream(path.join(mainCatalog,file.name)); 
+                let writestream = fs.createWriteStream(path.join(createCatalog,file.name),'utf8');
+                let stat = await fs.promises.stat(path.join(mainCatalog,file.name));                
+                console.log(`++++++++++++size of file is ${file.name}======${stat.size}++++++++++`);
+                let dataView = new DataView( new ArrayBuffer(stat.size)); let byteOffset =0;                
+                readstream.on("data",chunk =>{
+                    console.log(`!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!`);
+                    console.log(`=====запись куска размером ${chunk.BYTES_PER_ELEMENT}=====${chunk.byteLength}`);                                        
+                    let dataView1 = new DataView(chunk.buffer);                     
+                    for ( let i =0; i<chunk.length;i+=chunk.BYTES_PER_ELEMENT){
+                        dataView.setUint8(i+byteOffset,dataView1.getUint8(i));
+                    }                   
+                    byteOffset+=chunk.length;
+                    console.log(dataView1.getUint8(0),dataView1.getUint8(1));
+                    console.log(dataView.getUint8(0),dataView.getUint8(1));                    
+                   fs.appendFile(path.join(createCatalog,file.name),chunk,cb);
+                });                
             }
         }
-        return resolve();
     }
+    catch (err) {console.log(err)}   
 }
-
-async function reamovecatalog(dir){     
-        return Promise.resolve( readdir(dir,{encoding:"utf-8",withFileTypes:true})).
-        then( files =>{ 
-            return new Promise( callbackF(resolve,files,dir));
-        })
-    }
-*/
-
-let read = false;
-
-async function recursiveFunc(mainCatalog,createCatalog){
-    let files = await readdir(mainCatalog,{encoding:"utf-8",withFileTypes:true});
-    for ( let file of files){        
-        let symb = Object.getOwnPropertySymbols(file)[0];
-        if (file[symb] === 2){
-            let newCreatedir = path.join(createCatalog,file.name), newMainDir = path.join(mainCatalog,file.name);
-            fs.mkdir(newCreatedir,(err)=>{if(err) throw err});
-             recursiveFunc(newMainDir,newCreatedir);            
-        }
-        else{
-            let readstream = fs.createReadStream(path.join(mainCatalog,file.name),"utf-8");
-            let writestream = fs.createWriteStream(path.join(createCatalog,file.name),"utf-8");
-            console.log(file.name);            
-            fs.stat(path.join(mainCatalog,file.name),(err,stats)=>{
-                if (err) throw err;                    
-                console.log(file.name,stats.size);
-                let arrBuffer = new Uint8Array(new ArrayBuffer(stats.size));
-                let dataView = new DataView(arrBuffer.buffer);
-                let start = 0;
-                readstream.on("data",(chunk)=>{
-                    //console.log(chunk);
-                    console.log(`******${file.name}***size chunk ${chunk.length}**********************`);
-                  //  console.log(chunk);
-                    //dataView.setInt8(start,Buffer); start+=chunk.length;
-                  /*  if(!read)  {
-                        stdout._write(chunk,"utf-8", err=> {if(err) throw err});
-                        read = true;
-                        stdout._write(dataView,"utf-8", err=> {if(err) throw err});
-                    }*/
-                    writestream.write(chunk,(err)=>{if(err) throw err});
-                });
-                readstream.on ("end",()=>{  
-                    if ( /footer.jpg/i.test(writestream.path)){
-                        console.log(`======размер футера=====${dataView.byteLength}======`);
-                        console.log(`======${dataView}======`);
-                    }
-                    console.log(writestream.path);
-                    //writestream.write(Buffer,(err)=>{(if)throw err});
-                    //writestream.write(dataView.buffer);
-                })                
-                
-            })
-        }
-         
-    }
-}     /*    else{                
-                readstream.pipe(writestream);
-                console.log('каталог файл для записи',path.join(mainCatalog,file.name));
-                console.log('каталог куда записывать файл',path.join(createCatalog,file.name));            
-            }*/
-     
-recursiveFunc(path.join(__dirname,'assets'),path.join(outputDir,'assets'));
-
 //****************start****************************/ 
-//читем куски из файлов формируем и формируем css_data и html_data
+//читем куски из файлов и формируем css_data и html_data
 let countprocessHTML = 1000, countprocessCSS = 1000;
 
 function createHTMLFile( path_dir, type){
@@ -152,15 +121,15 @@ function createHTMLFile( path_dir, type){
     })
 }
 
+//стрим чтения template.html
 const readableStream = fs.createReadStream(path.join(__dirname,'template.html'),'utf-8');
 readableStream.on("data", chunk=>{html_data +=chunk.toString();});
+//при окончании чтения template.html обработчик запуска записи в файл 1)components.html 2)style.css 
 readableStream.on("end",()=>{
     [[path.join(__dirname, 'components'),'html'],[path.join(__dirname, 'styles'),'css']] .forEach( el =>{
         createHTMLFile(el[0],el[1]);
     });
 })
-
-//********************end**********************/
 
 //********************start*******************/
 //создаем пользовательский обработчик событий writeHTML, (once - отработает только один раз, вместо on)
@@ -176,55 +145,14 @@ let intervalHTML = setInterval( ( )=>{
         clearInterval(intervalHTML);
     }},1000);
 
-///интервал опроса о завершении чтения html файлов в папке components
-/*
-function callback(...arg){
-    while (process){
-        let innterval = setTimeout() () (callback,1000,process,interval)
-    }
-    clearTimeout(arg[1]); resolve(nameevents);
-}
-
-function startWorkPromise( proces,nameevents ){
-    return new Promise( (resolve,reject)=>{
-        let intervalHTML = setTimeout( callback,1000,intervalHTML);
-    })};
-
-    startWorkPromise(countprocessHTML,'writeHTML').
-    then( event=>{Myevents.emit(event); return startWorkPromise(countprocessCSS,'writeCSS')}).
-    then( event=>{Myevents.emit(event);
-        recursiveFunc(path.join(__dirname,'assets'),path.join(outputDir,'assets'));
-     }).
-     finally( ()=>{
-        const requestHandler = (request, response) => {            
-            response.end(html_data);
-        };
-        let server = http.createServer(requestHandler);
-        server.listen(PORT,hostname,()=>{console.log(`Сервер запущен по адреcу: http://${hostname}:${PORT}`)})
-     });
-     */
-
-    //создаем пользовательский обработчик событий writeCSS, для формирования style.css
+//создаем пользовательский обработчик событий writeCSS, для формирования style.css
 Myevents.once('writeCSS',()=>{    
     writeableStreamCSS.write(css_data);    
 })
-
+    
 let intervalCSS = setInterval( ( )=>{ 
     if (!countprocessCSS) {
         Myevents.emit("writeCSS"); 
         clearInterval(intervalCSS);
-    }},1000);    
-//********************end**********************/
-
-
-/*    process.on("exit",(code)=>{
-        console.log('Итоговый html текст:\n');
-        console.log(html_data);
-    })
-  */  
+}},1000);    
     
-
-
-
-
-
