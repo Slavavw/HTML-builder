@@ -2,17 +2,19 @@ const fs = require('fs');
 const path = require('path');
 const fs_promise = fs.promises;
 const outputDir = path.join(__dirname,'files');
+const inputDir = path.join(__dirname,'files-copy');
 
-const promise_dir = (async function(){
+(async function(){
     try {
-        const exists = fs.existsSync(path.join(__dirname,'files-copy'));
-        if (!exists) {
-            fs.mkdir(path.join(__dirname,'files-copy'),err=>{
-                if (err) throw err;
-                console.log('Папка создана');
-            });
+        const exists = fs.existsSync(inputDir);
+        if (!exists)  await fs_promise.mkdir(inputDir);
+        else {console.log('Папка была ранее создана обновим ее, перезаписав');
+            let files =  await fs_promise.readdir(inputDir);            
+            for ( let file of files ){            
+                console.log(file);
+                await fs_promise.unlink(path.join(inputDir,file));                
+            };             
         }
-        else console.log('Папка была ранее создана');
     } catch (e) { console.log(e); }
 })();
 
