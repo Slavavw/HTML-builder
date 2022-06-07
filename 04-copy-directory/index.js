@@ -1,3 +1,5 @@
+/* eslint-disable quotes */
+/* eslint-disable indent */
 const fs = require('fs');
 const path = require('path');
 const fs_promise = fs.promises;
@@ -13,10 +15,10 @@ const inputDir = path.join(__dirname,'files-copy');
             for ( let file of files ){            
                 console.log(file);
                 await fs_promise.unlink(path.join(inputDir,file));                
-            };             
+            }             
         }
     } catch (e) { console.log(e); }
-})();
+})();  
 
 async function readFileInDir(){
     try {
@@ -29,4 +31,4 @@ async function readFileInDir(){
      }catch (err) { console.error(err);}
 }
 
- let res = readFileInDir();
+ readFileInDir();
