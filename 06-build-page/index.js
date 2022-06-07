@@ -52,17 +52,23 @@ async function reamovecatalog(dir){
     try{     
         let files = await fs.promises.readdir(dir,{encoding:"utf-8",withFileTypes:true})        
         console.log(files.length);
-        console.log(files);        
-        for await( let file of files){
-            let newdir = path.join(dir,file.name);            
-            if (file.isFile()) {
-                console.log(`deleted file `,newdir);
-                fs.promises.unlink(newdir);
+        console.log(files);
+        if (files.length){
+            for await( let file of files){
+                let newdir = path.join(dir,file.name);            
+                if (file.isFile()) {
+                    console.log(`deleted file `,newdir);
+                    fs.promises.unlink(newdir);
+                }
+                else  await reamovecatalog(newdir);
             }
-            else  await reamovecatalog(newdir);
+            await fs.promises.rmdir(dir);
+            console.log(`delted каталог `,dir);         
         }
-        await fs.promises.rmdir(dir);
-        console.log(`delted каталог `,dir);         
+        else {
+            await fs.promises.rmdir(dir);
+            console.log(`delted каталог `,dir);
+        }
     }
     catch (error) {console.log(error)}
 }    
