@@ -1,11 +1,7 @@
 const {stdout,stdin,exit} = process;
 const fs = require('fs');
 const path = require('path');
-const { rawListeners } = require('process');
-let result ='';
-
 const pathFile = path.join(__dirname,'text.txt')
-
 const readline = require("readline");
 const rs = readline.createInterface({input:stdin, output:stdout});
 
@@ -17,7 +13,6 @@ stdin.on("keypress",(_,key)=>{
         console.log("\nGood by! You whant go out and stop record!");
     }
 })
-
 
 function write(){
     rs.question("Enter anything?",(str)=>{
