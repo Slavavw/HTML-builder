@@ -1,0 +1,23 @@
+{
+  "name": "html-builder",
+  "version": "1.0.0",
+  "description": "htnl-builder",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+ssh://git@github.com/Slavavw/HTML-builder.git"
+  },
+  "author": "Slava Mikhailovskiy <slava_vw@mail.ru>",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/Slavavw/HTML-builder/issues"
+  },
+  "homepage": "https://github.com/Slavavw/HTML-builder#readme",
+  "devDependencies": {
+    "nodemon": "^2.0.16",
+    "stream-promise": "^3.2.0"
+  }
+}

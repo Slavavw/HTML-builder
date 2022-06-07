@@ -15,58 +15,50 @@ let writeableStreamHTML,writeableStreamCSS;
 
 const cb = (err)=>{ if(err) throw err};
 
-start();
-
-async function start(){ console.log('start');
+(async function(){ console.log('start');
     try{     
-        await fs.exists(outputDir, async (exists) =>{
-            if (!exists) 
-                await fs.mkdir(outputDir,cb);                 
-            else {
-                await reamovecatalog(path.join(outputDir));
-                ['template.html','style.css'].forEach( async el =>{
-                    await fs.exists(path.join(outputDir,el), async exist =>{
-                        if (exist) await fs.unlink(path.join(outputDir,el),err=>{
-                            if (err) throw err
-                            console.log("Удалил файл ",path.join(outputDir,el));
-                        });
-                    });                     
-                    /*await fs.promises.rmdir(outputDir);
-                    console.log(`delted каталог `,outputDir); */
-                })                
-            }
-            await fs.exists(path.join(outputDir,'assets'), async exists =>{
-                if (!exists) {                    
-                    await fs.promises.mkdir(path.join(outputDir,'assets'));
-                    console.log('создаю директорию',path.join(outputDir,'assets'));
+        if (!fs.existsSync(outputDir)) fs.mkdir(outputDir,cb);
+        else {  
+            await  reamovecatalog(path.join(outputDir));
+            ['template.html','style.css'].forEach( el =>{
+                if ( fs.existsSync(path.join(outputDir,el))){
+                    fs.unlink(path.join(outputDir,el),err=>{if (err) throw err});
                 }
-            });
-            [writeableStreamHTML,writeableStreamCSS] = file_names.map(file=>{return fs.createWriteStream(path.join(outputDir,`${file}`),"utf-8");});            
-            recursiveFunc(path.join(__dirname,'assets'),path.join(outputDir,'assets'));
-        });        
+            })
+
+        }
+        if (!fs.existsSync(path.join(outputDir,'assets'))){ 
+            await fs.promises.mkdir(path.join(outputDir,'assets'));
+            return file_names.map( file =>{ return fs.createWriteStream(path.join(outputDir,`${file}`),"utf-8");}); 
+        }
+        return file_names.map( file =>{ return fs.createWriteStream(path.join(outputDir,`${file}`),"utf-8");}); 
     }
     catch (error) { console.log(error)};    
-};
+})().then( arr=>{[writeableStreamHTML,writeableStreamCSS] = arr}).then(()=>{
+    recursiveFunc(path.join(__dirname,'assets'),path.join(outputDir,'assets'));
+}).catch( (err)=>{ throw err});
 
 async function reamovecatalog(dir){
     try{     
-        let files = await fs.promises.readdir(dir,{encoding:"utf-8",withFileTypes:true})        
-        console.log(files.length);
-        console.log(files);        
-        for await( let file of files){
-            let newdir = path.join(dir,file.name);            
-            if (file.isFile()) {
-                console.log(`deleted file `,newdir);
-                fs.promises.unlink(newdir);
-            }
-            else  await reamovecatalog(newdir);
+        let files = await fs.promises.readdir(dir,{encoding:"utf-8",withFileTypes:true})
+        if (!files.length) { console.log(`delted каталог `,dir); 
+            await fs.promises.rmdir(dir);
         }
-        await fs.promises.rmdir(dir);
-        console.log(`delted каталог `,dir);         
+        else{
+            for (const  file of files){            
+                let symb = Object.getOwnPropertySymbols(file).shift();
+                let newdir = path.join(dir,file.name);                
+                if (file[symb] ===2) reamovecatalog(newdir);            
+                else {  console.log(`deleted file `,newdir);
+                    await fs.promises.unlink(newdir);
+                }
+            }
+        }
     }
     catch (error) {console.log(error)}
 }    
 
+let fierst = true;
 let iter = 0;
 async function recursiveFunc(mainCatalog,createCatalog){  
     try{   
